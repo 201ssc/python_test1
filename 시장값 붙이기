@@ -1,0 +1,128 @@
+import pandas as pd
+from datetime import datetime
+import test
+
+mk = test.MarketDB()
+
+
+def get_value(self, ticker):  # DB에서 가져온 데이터
+    today = datetime.today().strftime("%Y-%m-%d")
+    btc_ohlcv = mk.get_df2(today, ticker)
+    df = btc_ohlcv
+    df.index = pd.to_datetime(df.index)
+    df = df.tail(100)
+    df = df.astype('float')
+    df['avg'] = (df['high'] + df['low']) / 2
+    ema8 = df.avg.ewm(span=8).mean()
+    ema8_1 = ema8.shift(1)
+    ema88 = ema8 - ema8_1
+
+    ema24 = df.avg.ewm(span=24).mean()
+    ema24_1 = ema24.shift(1)
+    ema244 = ema24 - ema24_1
+
+    ema48 = df.avg.ewm(span=48).mean()
+    ema48_1 = ema48.shift(1)
+    ema488 = ema48 - ema48_1
+
+    df = df.assign(ema8=ema8, ema88=ema88, ema244=ema244, ema488=ema488)
+
+    ## 단기 추세, 1 or -1
+    em8 = []
+    for i in df.ema88:
+        if i > 0:
+            em8.append(1)
+        else:
+            em8.append(0)
+    df['em8'] = em8
+
+    em24 = []
+    for i in df.ema244:
+        if i > 0:
+            em24.append(1)
+        else:
+            em24.append(0)
+    df['em24'] = em24
+
+    em48 = []
+    for i in df.ema488:
+        if i > 0:
+            em48.append(1)
+        else:
+            em48.append(0)
+    df['em48'] = em48
+
+    df['cv'] = df.volume * df.close
+
+    df = df[['em8', 'em24', 'em48', 'cv']]
+    return df
+
+
+def get_change(self, ticker):  # 가져온 데이터 붙이기 쉽게 가공
+    a = self.get_value(ticker)
+    val1 = a.em8.to_list()
+    val2 = a.em24.to_list()
+    val3 = a.em48.to_list()
+    val = a.cv.to_list()
+
+    ind = a.index.strftime("%Y-%m-%d").to_list()  # list
+
+    df = pd.DataFrame(index=[], columns=[ind])
+    df1 = df.append(pd.Series(val1, index=df.columns), ignore_index=True)
+    df2 = df.append(pd.Series(val2, index=df.columns), ignore_index=True)
+    df3 = df.append(pd.Series(val3, index=df.columns), ignore_index=True)
+    cv = df.append(pd.Series(val, index=df.columns), ignore_index=True)
+
+    return df1, df2, df3, cv, ind
+
+
+def get_rate(self, df):  # 가공함수
+    total = df.count()
+    win = df.sum()
+    rate = win / total
+    dff = pd.DataFrame()
+    dff = dff.assign(rate=rate)
+    dff.rate = round(dff.rate.astype(float), 5)
+    return dff, total
+
+
+def get_sum_vol(self, cv):  # 총 거래량 합치기 함수
+    total = cv.count()
+    sum = cv.sum()
+    cvv = pd.DataFrame()
+    cvv = cvv.assign(sum=sum)
+    return cvv, total
+
+
+def get_dff(self):  # 가공된 데이터
+    tickers = mk.get_coin()  # USDT 붙여서?
+
+    # # 1안 실패 날짜가 이상하다.
+    df1 = pd.DataFrame()
+    df2 = pd.DataFrame()
+    df3 = pd.DataFrame()
+    df4 = pd.DataFrame()
+
+    for i, j in zip(range(0, len(tickers)), tickers):
+        a, b, c, cv, pp = self.get_change(j)
+        df1 = df1.append(a, sort=False)
+        df2 = df2.append(b, sort=False)
+        df3 = df3.append(c, sort=False)
+        df4 = df4.append(cv, sort=False)
+        row = a.shape[1]
+        print("#{:03d} {}: {} row clear".format(i, j, row))
+
+    df1 = df1[pp]
+    df2 = df2[pp]
+    df3 = df3[pp]
+    df4 = df4[pp]
+
+    d1, t = self.get_rate(df1)
+    d2, t = self.get_rate(df2)
+    d3, t = self.get_rate(df3)
+    d4, t = self.get_sum_vol(df4)
+
+    dff = pd.DataFrame()
+    dff = dff.assign(rate8=d1, rate24=d2, rate48=d3, flow=d4, count=t)
+    dff['date'] = pp
+    return dff
