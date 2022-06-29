@@ -48,17 +48,20 @@ for i in range(0, len(a)):
     for j in range(0, len(b)):
         bb = b["seller"][j]
         if aa == bb:
-           print(aa)
+
            alco =a["price"][i] + a["charge"][i]+ b["price"][j] # 총가격
            alse = a["seller"][i]  # 판매자
            ag = a["grade"][i]
            bg = b["grade"][i]
            all = [alco,alse,ag,bg]
            df= df.append(pd.Series(all, index=df.columns), ignore_index=True)
+           print("중복 판매자가 존재합니다. \n 총:'{}원', 판매자:'{}', 등급:{}".format(alco,alse,(ag,bg)))
         else:
             pass
+
 indc = a['price'][0] + a["charge"][0] + b['price'][0] + b["charge"][0] # 개별가격 최저가
 indse = a["seller"][0], b["seller"][0]
 indgr = a["grade"][0], b["grade"][0]
-print("\n개별로 구매할 실 경우 가격은 총 '{}원' 입니다."
-      "\n 판매자:{}, 등급:{}".format(indc,indse,indgr))
+print("\n개별로 구매할 실 경우 최저가는 \n 총: '{}원', 판매자:{}, 등급:{}".format(indc,indse,indgr))
+
+
